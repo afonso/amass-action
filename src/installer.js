@@ -1,66 +1,118 @@
 import fs from 'fs';
 import https from 'https';
 import os from 'os';
+import path from 'path';
 import * as core from '@actions/core';
 import * as tc from '@actions/tool-cache';
 
 const ROOT_URL = "https://github.com/owasp-amass/amass/releases/download";
 
 function getPackage() {
+    const arch = os.arch();
+    let osName;
+
     switch (os.type()) {
         case 'Windows_NT':
-            return `/amass_Windows_amd64`;
+            osName = 'Windows';
+            break;
         case 'Darwin':
-            return `/amass_Darwin_amd64`;
-		case 'Freebsd':
-            return `/amass_Freebsd_amd64`;
+            osName = 'Darwin';
+            break;
+        case 'FreeBSD':
+            osName = 'Freebsd';
+            break;
         case 'Linux':
+            osName = 'Linux';
+            break;
         default:
-            return `/amass_Linux_amd64`;
+            throw new Error(`Unsupported OS type: ${os.type()}`);
     }
+
+    const archMap = {
+        x64: 'amd64',
+        arm64: 'arm64',
+        arm: 'arm',
+        ia32: '386'
+    };
+
+    const goArch = archMap[arch];
+    if (!goArch) {
+        throw new Error(`Unsupported architecture: ${arch}`);
+    }
+
+    return `amass_${osName}_${goArch}`;
 }
 
 async function getLatestInfo() {
-	return new Promise((resolve, reject) => {
-		let data = [];
-		https.get({
-			hostname: 'api.github.com',
-			path: '/repos/owasp-amass/amass/releases/latest',
-			headers: { 'User-Agent': 'Github Actions' }
-		}, res => {
-			res.on('data', chunk => data.push(chunk));
-			res.on('close', () => resolve(JSON.parse(data.join(''))));
-		}).on('error', err => {
-			reject(err);
-		});
-	});
-};
+    return new Promise((resolve, reject) => {
+        let data = [];
+        const options = {
+            hostname: 'api.github.com',
+            path: '/repos/owasp-amass/amass/releases/latest',
+            headers: {
+                'User-Agent': 'Github Actions',
+                // Include token if available
+                ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` })
+            }
+        };
+        https.get(options, res => {
+            const { statusCode } = res;
+            if (statusCode !== 200) {
+                reject(new Error(`Request Failed. Status Code: ${statusCode}`));
+                res.resume();
+                return;
+            }
+            res.on('data', chunk => data.push(chunk));
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data.join('')));
+                } catch (error) {
+                    reject(new Error('Failed to parse JSON response'));
+                }
+            });
+        }).on('error', err => {
+            reject(err);
+        });
+    });
+}
+
+async function getAssetDownloadUrl(selectedVersion, packageName) {
+    const release = await getLatestInfo();
+    const asset = release.assets.find(a => a.name === `${packageName}.zip`);
+    if (!asset) {
+        throw new Error(`Asset ${packageName}.zip not found in release ${selectedVersion}`);
+    }
+    return asset.browser_download_url;
+}
 
 export async function downloadAndInstall(version) {
-	const toolName = "amass";
-	const release = await getLatestInfo();
+    const toolName = "amass";
+    const release = await getLatestInfo();
+    const selectedVersion = version || release.tag_name;
 
-	core.startGroup(`Download and install Amass ${version ? version : release.tag_name }`);
+    core.startGroup(`Download and install Amass ${selectedVersion}`);
 
-	const packageName = getPackage();
-	const url = `${ROOT_URL}/${version ? version : release.tag_name }/${packageName}.zip`;
+    const packageName = getPackage();
+    const url = await getAssetDownloadUrl(selectedVersion, packageName);
 
-	core.info(`Download version ${version ? version : release.tag_name } from ${url}.`);
+    core.info(`Download version ${selectedVersion} from ${url}.`);
 
-	const downloadDir = await tc.downloadTool(url);
-	if (downloadDir == null) {
-		throw new Error(`Unable to download Amass from ${url}.`);
-	}
+    const downloadPath = await tc.downloadTool(url);
+    if (!downloadPath) {
+        throw new Error(`Unable to download Amass from ${url}.`);
+    }
 
-	const installDir = await tc.extractZip(downloadDir);
-	if (installDir == null) {
-		throw new Error("Unable to extract Amass.");
-	}
+    const installDir = await tc.extractZip(downloadPath);
+    if (!installDir) {
+        throw new Error("Unable to extract Amass.");
+    }
 
-	const binPath = `${installDir}/${packageName}/${toolName}`
-	fs.chmodSync(binPath, "777");
+    const binPath = path.join(installDir, packageName, toolName);
+    fs.chmodSync(binPath, "755");
 
-	core.info(`Amass ${version ? version : release.tag_name } was successfully installed to ${installDir}.`);
-	core.endGroup();
-	return binPath
+    core.addPath(path.dirname(binPath));
+
+    core.info(`Amass ${selectedVersion} was successfully installed to ${installDir}.`);
+    core.endGroup();
+    return binPath;
 }
