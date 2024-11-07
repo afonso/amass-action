@@ -4,19 +4,19 @@ import os from 'os';
 import * as core from '@actions/core';
 import * as tc from '@actions/tool-cache';
 
-const ROOT_URL = "https://github.com/OWASP/Amass/releases/download";
+const ROOT_URL = "https://github.com/owasp-amass/amass/releases/download";
 
 function getPackage() {
     switch (os.type()) {
         case 'Windows_NT':
-            return `/amass_windows_amd64`;
+            return `/amass_Windows_amd64`;
         case 'Darwin':
-            return `/amass_darwin_amd64`;
+            return `/amass_Darwin_amd64`;
 		case 'Freebsd':
-            return `/amass_freebsd_amd64`;
+            return `/amass_Freebsd_amd64`;
         case 'Linux':
         default:
-            return `/amass_linux_amd64`;
+            return `/amass_Linux_amd64`;
     }
 }
 
@@ -25,7 +25,7 @@ async function getLatestInfo() {
 		let data = [];
 		https.get({
 			hostname: 'api.github.com',
-			path: '/repos/OWASP/Amass/releases/latest',
+			path: '/repos/owasp-amass/amass/releases/latest',
 			headers: { 'User-Agent': 'Github Actions' }
 		}, res => {
 			res.on('data', chunk => data.push(chunk));
