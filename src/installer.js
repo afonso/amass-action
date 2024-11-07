@@ -5,7 +5,7 @@ import path from 'path';
 import * as core from '@actions/core';
 import * as tc from '@actions/tool-cache';
 
-const ROOT_URL = "https://github.com/owasp-amass/amass/releases/download";
+const ROOT_URL = "https://github.com/OWASP/Amass/releases/download";
 
 function getPackage() {
     const arch = os.arch();
@@ -48,10 +48,9 @@ async function getLatestInfo() {
         let data = [];
         const options = {
             hostname: 'api.github.com',
-            path: '/repos/owasp-amass/amass/releases/latest',
+            path: '/repos/OWASP/Amass/releases/latest',
             headers: {
                 'User-Agent': 'Github Actions',
-                // Inclui token se disponível
                 ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` })
             }
         };
@@ -94,7 +93,7 @@ export async function downloadAndInstall(version) {
     const release = await getLatestInfo();
     const selectedVersion = version || release.tag_name;
 
-    // Depuração para garantir que `selectedVersion` e `packageName` estão corretos
+    // Debugging to ensure that `selectedVersion` and `packageName` are correct
     if (!selectedVersion) {
         throw new Error("Version is undefined. Ensure 'getLatestInfo()' returned a valid release with 'tag_name'.");
     }
@@ -103,6 +102,8 @@ export async function downloadAndInstall(version) {
     if (!packageName) {
         throw new Error("Package name is undefined. Ensure 'getPackage()' returned a valid package.");
     }
+
+    core.startGroup(`Download and install Amass ${selectedVersion}`);
 
     const url = await getAssetDownloadUrl(selectedVersion, packageName);
     core.info(`Download version ${selectedVersion} from ${url}.`);
