@@ -51,7 +51,7 @@ async function getLatestInfo() {
             path: '/repos/owasp-amass/amass/releases/latest',
             headers: {
                 'User-Agent': 'Github Actions',
-                // Include token if available
+                // Inclui token se disponível
                 ...(process.env.GITHUB_TOKEN && { 'Authorization': `token ${process.env.GITHUB_TOKEN}` })
             }
         };
@@ -65,7 +65,11 @@ async function getLatestInfo() {
             res.on('data', chunk => data.push(chunk));
             res.on('end', () => {
                 try {
-                    resolve(JSON.parse(data.join('')));
+                    const releaseInfo = JSON.parse(data.join(''));
+                    if (!releaseInfo.tag_name) {
+                        reject(new Error("Invalid response: 'tag_name' not found"));
+                    }
+                    resolve(releaseInfo);
                 } catch (error) {
                     reject(new Error('Failed to parse JSON response'));
                 }
@@ -90,11 +94,17 @@ export async function downloadAndInstall(version) {
     const release = await getLatestInfo();
     const selectedVersion = version || release.tag_name;
 
-    core.startGroup(`Download and install Amass ${selectedVersion}`);
+    // Depuração para garantir que `selectedVersion` e `packageName` estão corretos
+    if (!selectedVersion) {
+        throw new Error("Version is undefined. Ensure 'getLatestInfo()' returned a valid release with 'tag_name'.");
+    }
 
     const packageName = getPackage();
-    const url = await getAssetDownloadUrl(selectedVersion, packageName);
+    if (!packageName) {
+        throw new Error("Package name is undefined. Ensure 'getPackage()' returned a valid package.");
+    }
 
+    const url = await getAssetDownloadUrl(selectedVersion, packageName);
     core.info(`Download version ${selectedVersion} from ${url}.`);
 
     const downloadPath = await tc.downloadTool(url);
