@@ -5725,7 +5725,10 @@ async function run() {
 
         // Setting up params
         params.push(`-d=${domains}`);
-        if (passive) params.push('-passive');
+	if (timeout) params.push(`-timeout ${timeout}`);
+        if (dnsfile) params.push(`-rf=${dnsfile}`);
+	if (dnsqps) params.push(`-dns-qps ${dnsqps}`);
+	if (passive) params.push('-passive');
         if (brute) params.push('-brute');
         params.push(`-o=${output ? output : 'amass.txt'}`);
 
