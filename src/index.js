@@ -4,6 +4,9 @@ import * as exec from '@actions/exec';
 import * as installer from './installer';
 
 const domains = core.getInput('domains', { required: true });
+const timeout = core.getInput('timeout', { required: false });
+const dnsfile = core.getInput('dnsfile', { required: false });
+const dnsqps = core.getInput('dnsqps', { required: false });
 const passive = core.getBooleanInput('passive', { required: false });
 const brute = core.getBooleanInput('brute', { required: false });
 const output = core.getInput('output', { required: false });
