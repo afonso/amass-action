@@ -14,6 +14,18 @@ inputs:
     required: false
     default: false
 
+  timeout:
+    description: "This will stop enumerating a domain after X amount of MINUTES, to guarantee the time spent enumeration."
+    required: false
+
+  dnsfile:
+    description: "Path to a file providing untrusted DNS resolvers"
+    required: false
+
+  dnsqps:
+    description: "Maximum number of DNS queries per second across all resolvers"
+    required: false
+    
   brute:
     description: "Execute brute forcing after searches"
     required: false
